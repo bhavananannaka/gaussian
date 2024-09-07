@@ -1,0 +1,128 @@
+`timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 28.04.2024 12:11:11
+// Design Name: 
+// Module Name: Controller1
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module Controller1(
+    input rst,
+    input clk,
+    input [7:0] DIN,
+    output [7:0] ConvOut,
+    output reg ConvOutValid
+    );
+parameter RowSize=99;
+parameter ColumnSize=99;
+//parameter ImageSize=RowSize*ColumnSize;
+parameter KernelSize=9;
+//reg [7:0] ShiftReg [ImageSize-1:0];
+
+reg [7:0] kernel1 [8:0];
+reg [10:0] SumMulInt[KernelSize-1:0];//define float
+reg [7:0] Buffer [KernelSize-1:0];
+
+//reg [7:0] Buffer [0:RowSize-1];
+
+integer scount, i;
+integer sumDataAvg, sumDataInt;//define float if required
+
+reg [2:0] ShiftState;
+parameter IDLE=0, Shifting = 1, CalcSum = 2, Averaging=3, ShiftBuffer=4;
+
+assign ConvOut = sumDataAvg[7:0];
+
+initial
+begin
+    kernel1[0] = 0;
+    kernel1[1] = 0;
+    kernel1[2] = 0;
+    kernel1[3] = 106;
+    kernel1[4] = 787;
+    kernel1[5] = 106;
+    kernel1[6] = 0;
+    kernel1[7] = 0;
+    kernel1[8] = 0;
+end
+
+
+
+always@(posedge clk)
+begin
+    if(rst==0)begin
+       scount =0;
+       sumDataInt=0;
+       sumDataAvg=0;
+       ConvOutValid<=0;
+       
+       ShiftState <= IDLE;
+       for(i=0;i<KernelSize;i=i+1)begin
+        Buffer[i]<='bZ;
+       end
+    end//end of rst
+    else begin
+        case(ShiftState)
+                IDLE:   begin
+                            scount =0;
+                            sumDataInt=0;
+                            sumDataAvg=0;
+                            ShiftState<=Shifting;
+                            i=0;
+                        end
+            Shifting:   begin
+                            
+                            for (i=0;i<KernelSize-1;i=i+1)begin
+                                Buffer[i]<=Buffer[i+1];
+                            end
+                            Buffer[KernelSize-1]=DIN;
+                            
+                            if(scount>KernelSize-1)begin
+                                ShiftState<=CalcSum;
+                            end
+                            else begin
+                                scount=scount+1;
+                            end
+                            ConvOutValid<=0;
+                        end
+            CalcSum:    begin
+                            SumMulInt[0]=Buffer[0]*kernel1[0];
+                            SumMulInt[1]=Buffer[1]*kernel1[1];
+                            SumMulInt[2]=Buffer[2]*kernel1[2];
+                            SumMulInt[3]=Buffer[3]*kernel1[3];
+                            SumMulInt[4]=Buffer[4]*kernel1[4];
+                            SumMulInt[5]=Buffer[5]*kernel1[5];
+                            SumMulInt[6]=Buffer[6]*kernel1[6];
+                            SumMulInt[7]=Buffer[7]*kernel1[7];
+                            SumMulInt[8]<=Buffer[8]*kernel1[8];
+                            ShiftState<=ShiftBuffer;
+                        end
+            ShiftBuffer: begin
+
+                            sumDataInt=SumMulInt[0]+SumMulInt[1]+SumMulInt[2]+SumMulInt[3]+SumMulInt[4]+SumMulInt[5]+SumMulInt[6]+SumMulInt[7]+SumMulInt[8];
+                            sumDataAvg=sumDataInt/1000;
+                            ConvOutValid<=1;
+                            for(i=0; i<KernelSize-2; i=i+1)begin
+                                Buffer[i]=Buffer[i+1];
+                            end
+                            ShiftState<=Shifting;
+                         end
+        endcase        
+    end//else end
+    
+end//end posedge
+endmodule
